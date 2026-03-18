@@ -338,6 +338,7 @@ def init_state():
         "preview_img": None,
         "show_success": False,
         "generating": False,
+        "uploader_key": 0,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -486,7 +487,7 @@ with st.container():
         type=["jpg", "jpeg", "png", "webp"],
         accept_multiple_files=True,
         label_visibility="collapsed",
-        key="file_uploader",
+        key=f"file_uploader_{st.session_state.uploader_key}",
     )
 
     # Merge new uploads into stored_images (avoid duplicates by name)
@@ -523,12 +524,14 @@ with st.container():
             st.session_state.show_success = False
             st.session_state.collage_buf = None
             st.session_state.preview_img = None
+            st.session_state.uploader_key += 1
         
         def clear_all():
             st.session_state.stored_images = []
             st.session_state.show_success = False
             st.session_state.collage_buf = None
             st.session_state.preview_img = None
+            st.session_state.uploader_key += 1
 
         # Remove buttons (one per image)
         n = len(st.session_state.stored_images)
