@@ -63,7 +63,7 @@ html, body, [data-testid="stAppViewContainer"] {
 .ff-tagline { font-size: 1.3rem; font-weight: 600; color: #F8FAFC; margin-bottom: 6px; }
 .ff-desc    { font-size: 0.875rem; color: #94A3B8; }
 
-/* ── Card ── */
+/* ── Card (via native container) ── */
 .ff-card {
     background: #1E293B;
     border-radius: 16px;
@@ -74,6 +74,25 @@ html, body, [data-testid="stAppViewContainer"] {
     transition: box-shadow 0.2s;
 }
 .ff-card:hover { box-shadow: 0 8px 32px rgba(99,102,241,0.1); }
+
+/* ── Hide empty markdown wrappers (orphan div tags) ── */
+[data-testid="stMarkdownContainer"]:has(> div:empty),
+.stMarkdown:empty {
+    display: none !important;
+    height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* ── Style native st.container blocks as cards ── */
+.section-card > div[data-testid="stVerticalBlock"] {
+    background: #1E293B;
+    border-radius: 16px;
+    padding: 24px 22px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+    margin-bottom: 14px;
+    border: 1px solid #334155;
+}
 
 /* ── Status Bar ── */
 .ff-status {
@@ -455,122 +474,95 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ─── Upload Section ───────────────────────────────────────────────────────────
-st.markdown('<div class="ff-card">', unsafe_allow_html=True)
-st.markdown('<div class="ff-section-title">📂 Upload Photos</div>', unsafe_allow_html=True)
-st.markdown("""
-<div style="text-align:center;padding:6px 0 14px;">
-  <div style="font-size:2rem;margin-bottom:6px;">📸</div>
-  <div style="font-size:1rem;font-weight:600;color:#F8FAFC;margin-bottom:4px;">Drop your photos here</div>
-  <div style="font-size:0.8rem;color:#64748B;">Upload 3–10 images • JPG, PNG, WebP supported</div>
-</div>
-""", unsafe_allow_html=True)
-
-new_files = st.file_uploader(
-    "Upload Photos",
-    type=["jpg", "jpeg", "png", "webp"],
-    accept_multiple_files=True,
-    label_visibility="collapsed",
-    key="file_uploader",
-)
-
-# Merge new uploads into stored_images (avoid duplicates by name)
-if new_files:
-    existing_names = {s["name"] for s in st.session_state.stored_images}
-    added = 0
-    for f in new_files:
-        if f.name not in existing_names and len(st.session_state.stored_images) < 10:
-            raw = f.read()
-            st.session_state.stored_images.append({
-                "name": f.name,
-                "bytes": raw,
-                "b64_thumb": make_thumb_b64(raw),
-            })
-            existing_names.add(f.name)
-            added += 1
-    if added:
-        st.session_state.show_success = False
-        st.session_state.collage_buf = None
-        st.session_state.preview_img = None
-        st.rerun()
-
-# ── Thumbnail Grid ────────────────────────────────────────────────────────────
-if st.session_state.stored_images:
-    st.markdown(f"""
-    <div class="thumb-count">
-      {len(st.session_state.stored_images)} of 10 images selected
+with st.container():
+    st.markdown("""
+    <div class="ff-card">
+      <div class="ff-section-title">📂 Upload Photos</div>
+      <div style="text-align:center;padding:6px 0 14px;">
+        <div style="font-size:2rem;margin-bottom:6px;">📸</div>
+        <div style="font-size:1rem;font-weight:600;color:#F8FAFC;margin-bottom:4px;">Drop your photos here</div>
+        <div style="font-size:0.8rem;color:#64748B;">Upload 3–10 images • JPG, PNG, WebP supported</div>
+      </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Build thumbnail HTML row
-    thumbs_html = '<div class="thumb-grid">'
-    for i, item in enumerate(st.session_state.stored_images):
-        thumbs_html += f"""
-        <div class="thumb-item">
-          <img src="data:image/jpeg;base64,{item['b64_thumb']}" title="{item['name']}"/>
-          <span class="thumb-num">{i+1}</span>
-        </div>"""
-    thumbs_html += "</div>"
-    st.markdown(thumbs_html, unsafe_allow_html=True)
+    new_files = st.file_uploader(
+        "Upload Photos",
+        type=["jpg", "jpeg", "png", "webp"],
+        accept_multiple_files=True,
+        label_visibility="collapsed",
+        key="file_uploader",
+    )
 
-    # Remove buttons row (one per image)
-    n = len(st.session_state.stored_images)
-    if n <= 5:
-        cols = st.columns(n)
-        for i, col in enumerate(cols):
-            with col:
-                st.markdown('<div class="btn-remove">', unsafe_allow_html=True)
-                if st.button(f"✕ #{i+1}", key=f"rm_{i}", use_container_width=True):
-                    st.session_state.stored_images.pop(i)
-                    st.session_state.show_success = False
-                    st.session_state.collage_buf = None
-                    st.session_state.preview_img = None
-                    st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
-    else:
-        # Two rows of remove buttons if many images
-        row1 = st.columns(5)
-        row2 = st.columns(n - 5)
-        for i, col in enumerate(row1):
-            with col:
-                st.markdown('<div class="btn-remove">', unsafe_allow_html=True)
-                if st.button(f"✕ #{i+1}", key=f"rm_{i}", use_container_width=True):
-                    st.session_state.stored_images.pop(i)
-                    st.session_state.show_success = False
-                    st.session_state.collage_buf = None
-                    st.session_state.preview_img = None
-                    st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
-        for j, col in enumerate(row2):
-            i = 5 + j
-            with col:
-                st.markdown('<div class="btn-remove">', unsafe_allow_html=True)
-                if st.button(f"✕ #{i+1}", key=f"rm_{i}", use_container_width=True):
-                    st.session_state.stored_images.pop(i)
-                    st.session_state.show_success = False
-                    st.session_state.collage_buf = None
-                    st.session_state.preview_img = None
-                    st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
-
-    # Clear all button
-    st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
-    _, col_clear, _ = st.columns([3, 1, 3])
-    with col_clear:
-        st.markdown('<div class="btn-secondary">', unsafe_allow_html=True)
-        if st.button("🗑 Clear All", use_container_width=True):
-            st.session_state.stored_images = []
+    # Merge new uploads into stored_images (avoid duplicates by name)
+    if new_files:
+        existing_names = {s["name"] for s in st.session_state.stored_images}
+        added = 0
+        for f in new_files:
+            if f.name not in existing_names and len(st.session_state.stored_images) < 10:
+                raw = f.read()
+                st.session_state.stored_images.append({
+                    "name": f.name,
+                    "bytes": raw,
+                    "b64_thumb": make_thumb_b64(raw),
+                })
+                existing_names.add(f.name)
+                added += 1
+        if added:
+            st.session_state.show_success = False
             st.session_state.collage_buf = None
             st.session_state.preview_img = None
-            st.session_state.show_success = False
             st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
 
-st.markdown('</div>', unsafe_allow_html=True)  # end upload card
+    # ── Thumbnail Grid ────────────────────────────────────────────────
+    if st.session_state.stored_images:
+        thumbs_html = f'<div class="thumb-count">{len(st.session_state.stored_images)} of 10 images selected</div><div class="thumb-grid">'
+        for i, item in enumerate(st.session_state.stored_images):
+            thumbs_html += f'<div class="thumb-item"><img src="data:image/jpeg;base64,{item["b64_thumb"]}" title="{item["name"]}"/><span class="thumb-num">{i+1}</span></div>'
+        thumbs_html += "</div>"
+        st.markdown(thumbs_html, unsafe_allow_html=True)
+
+        # Remove buttons (one per image)
+        n = len(st.session_state.stored_images)
+        rm_cols = st.columns(min(n, 5))
+        for i in range(min(n, 5)):
+            with rm_cols[i]:
+                st.markdown('<div class="btn-remove">', unsafe_allow_html=True)
+                if st.button(f"✕ #{i+1}", key=f"rm_{i}", use_container_width=True):
+                    st.session_state.stored_images.pop(i)
+                    st.session_state.show_success = False
+                    st.session_state.collage_buf = None
+                    st.session_state.preview_img = None
+                    st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+        if n > 5:
+            rm_cols2 = st.columns(n - 5)
+            for j in range(n - 5):
+                i = 5 + j
+                with rm_cols2[j]:
+                    st.markdown('<div class="btn-remove">', unsafe_allow_html=True)
+                    if st.button(f"✕ #{i+1}", key=f"rm_{i}", use_container_width=True):
+                        st.session_state.stored_images.pop(i)
+                        st.session_state.show_success = False
+                        st.session_state.collage_buf = None
+                        st.session_state.preview_img = None
+                        st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+        # Clear all
+        _, col_clear, _ = st.columns([3, 1, 3])
+        with col_clear:
+            st.markdown('<div class="btn-secondary">', unsafe_allow_html=True)
+            if st.button("🗑 Clear All", use_container_width=True):
+                st.session_state.stored_images = []
+                st.session_state.collage_buf = None
+                st.session_state.preview_img = None
+                st.session_state.show_success = False
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
 
 # ─── Settings Panel ───────────────────────────────────────────────────────────
-st.markdown('<div class="ff-card">', unsafe_allow_html=True)
-st.markdown('<div class="ff-section-title">⚙️ Settings</div>', unsafe_allow_html=True)
-
+st.markdown('<div class="ff-card"><div class="ff-section-title">⚙️ Settings</div></div>', unsafe_allow_html=True)
 col1, col2, col3 = st.columns(3)
 with col1:
     st.markdown('<div class="ff-label">Output Quality</div>', unsafe_allow_html=True)
@@ -587,8 +579,6 @@ with col3:
     st.markdown('<div class="ff-label">Border Width</div>', unsafe_allow_html=True)
     border_width = st.slider("Border", 0, 40, 10, 2, format="%dpx", label_visibility="collapsed")
     st.markdown(f'<div style="font-size:0.75rem;color:#64748B;margin-top:3px;">{border_width}px gap</div>', unsafe_allow_html=True)
-
-st.markdown('</div>', unsafe_allow_html=True)  # end settings card
 
 # ─── Generate Button ──────────────────────────────────────────────────────────
 _, col_btn, _ = st.columns([1, 2, 1])
@@ -615,11 +605,11 @@ if generate_clicked:
                 st.error(f"Something went wrong: {e}")
 
 # ─── Preview Section ──────────────────────────────────────────────────────────
-st.markdown('<div class="ff-card">', unsafe_allow_html=True)
+st.markdown('<div class="ff-card"><div class="ff-section-title" style="margin-bottom:4px;">🖼️ Collage Preview</div></div>', unsafe_allow_html=True)
 
 col_t, col_r1, col_r2 = st.columns([3, 1, 1])
 with col_t:
-    st.markdown('<div class="ff-section-title" style="margin-bottom:0;padding-top:6px;">🖼️ Collage Preview</div>', unsafe_allow_html=True)
+    st.write("")
 with col_r1:
     if st.session_state.collage_buf:
         st.markdown('<div class="btn-regen">', unsafe_allow_html=True)
@@ -650,8 +640,6 @@ else:
       <p>Your collage will appear here ✨</p>
     </div>
     """, unsafe_allow_html=True)
-
-st.markdown('</div>', unsafe_allow_html=True)  # end preview card
 
 # ─── Footer ───────────────────────────────────────────────────────────────────
 st.markdown("""
