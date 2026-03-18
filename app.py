@@ -1,7 +1,8 @@
 import streamlit as st
-from PIL import Image, ImageDraw
+from PIL import Image
 import io
 import math
+import base64
 
 # ─── Page Config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -11,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# ─── Custom CSS ───────────────────────────────────────────────────────────────
+# ─── CSS ──────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -26,10 +27,11 @@ html, body, [data-testid="stAppViewContainer"] {
 
 [data-testid="stAppViewContainer"] > .main > div {
     padding-top: 0 !important;
-    max-width: 860px !important;
+    max-width: 880px !important;
     margin: 0 auto !important;
     padding-left: 16px !important;
     padding-right: 16px !important;
+    padding-bottom: 40px !important;
 }
 
 /* Hide Streamlit chrome */
@@ -38,7 +40,6 @@ html, body, [data-testid="stAppViewContainer"] {
 [data-testid="stToolbar"],
 .stDeployButton { display: none !important; visibility: hidden !important; }
 
-/* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: #0F172A; }
 ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
@@ -46,7 +47,7 @@ html, body, [data-testid="stAppViewContainer"] {
 /* ── Header ── */
 .ff-header {
     text-align: center;
-    padding: 48px 0 32px;
+    padding: 44px 0 28px;
 }
 .ff-logo {
     font-size: 2rem;
@@ -59,71 +60,103 @@ html, body, [data-testid="stAppViewContainer"] {
     line-height: 1.1;
     margin-bottom: 10px;
 }
-.ff-tagline {
-    font-size: 1.35rem;
-    font-weight: 600;
-    color: #F8FAFC;
-    margin-bottom: 8px;
-}
-.ff-desc {
-    font-size: 0.9rem;
-    color: #94A3B8;
-    font-weight: 400;
-}
+.ff-tagline { font-size: 1.3rem; font-weight: 600; color: #F8FAFC; margin-bottom: 6px; }
+.ff-desc    { font-size: 0.875rem; color: #94A3B8; }
 
-/* ── Cards ── */
+/* ── Card ── */
 .ff-card {
     background: #1E293B;
     border-radius: 16px;
-    padding: 28px 24px;
+    padding: 24px 22px;
     box-shadow: 0 4px 24px rgba(0,0,0,0.3);
-    margin-bottom: 16px;
+    margin-bottom: 14px;
     border: 1px solid #334155;
     transition: box-shadow 0.2s;
 }
-.ff-card:hover {
-    box-shadow: 0 8px 32px rgba(99,102,241,0.12);
+.ff-card:hover { box-shadow: 0 8px 32px rgba(99,102,241,0.1); }
+
+/* ── Status Bar ── */
+.ff-status {
+    background: #1E293B;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 13px 18px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #94A3B8;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s;
 }
+.ff-status.ready  { border-color: rgba(99,102,241,0.4); color: #818CF8; background: rgba(99,102,241,0.08); }
+.ff-status.success{ border-color: rgba(16,185,129,0.4); color: #34D399;  background: rgba(16,185,129,0.08); }
 
 /* ── Upload Zone ── */
-.ff-upload-label {
-    font-size: 1.15rem;
-    font-weight: 600;
-    color: #F8FAFC;
-    margin-bottom: 6px;
-}
-.ff-upload-sub {
-    font-size: 0.82rem;
-    color: #64748B;
-    margin-bottom: 18px;
-}
-
 [data-testid="stFileUploader"] {
     background: #0F172A !important;
     border: 2px dashed #334155 !important;
     border-radius: 12px !important;
-    padding: 20px !important;
     transition: border-color 0.25s !important;
 }
-[data-testid="stFileUploader"]:hover {
-    border-color: #6366F1 !important;
-}
+[data-testid="stFileUploader"]:hover { border-color: #6366F1 !important; }
 [data-testid="stFileUploader"] label { display: none !important; }
-[data-testid="stFileUploader"] > div {
-    color: #94A3B8 !important;
+[data-testid="stFileUploaderDropzoneInstructions"] { color: #64748B !important; }
+
+/* ── Thumbnail Grid ── */
+.thumb-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 16px 0 10px;
 }
-[data-testid="stFileUploaderDropzoneInstructions"] {
-    color: #94A3B8 !important;
+.thumb-item {
+    position: relative;
+    width: 92px;
+    flex-shrink: 0;
+}
+.thumb-item img {
+    width: 92px;
+    height: 72px;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 1.5px solid #334155;
+    display: block;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.thumb-item:hover img {
+    transform: scale(1.04);
+    box-shadow: 0 6px 20px rgba(99,102,241,0.3);
+    border-color: #6366F1;
+}
+.thumb-num {
+    position: absolute;
+    bottom: 4px;
+    left: 5px;
+    background: rgba(15,23,42,0.75);
+    color: #F8FAFC;
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 5px;
+    pointer-events: none;
+}
+.thumb-count {
+    font-size: 0.8rem;
+    color: #64748B;
+    margin-top: 4px;
+    font-weight: 500;
 }
 
 /* ── Settings Labels ── */
 .ff-label {
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     font-weight: 700;
     letter-spacing: 0.1em;
     color: #64748B;
     text-transform: uppercase;
-    margin-bottom: 8px;
+    margin-bottom: 7px;
 }
 .ff-badge {
     display: inline-block;
@@ -131,10 +164,10 @@ html, body, [data-testid="stAppViewContainer"] {
     color: white;
     font-size: 0.58rem;
     font-weight: 700;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.08em;
     padding: 2px 8px;
     border-radius: 20px;
-    margin-top: 6px;
+    margin-top: 5px;
     text-transform: uppercase;
 }
 
@@ -155,10 +188,6 @@ html, body, [data-testid="stAppViewContainer"] {
 
 /* ── Slider ── */
 [data-testid="stSlider"] > div { padding: 0 !important; }
-.stSlider [data-baseweb="slider"] div[role="slider"] {
-    background: #6366F1 !important;
-    border-color: #6366F1 !important;
-}
 
 /* ── Buttons ── */
 .stButton > button {
@@ -190,7 +219,6 @@ html, body, [data-testid="stAppViewContainer"] {
     font-size: 0.875rem !important;
     font-weight: 600 !important;
     padding: 10px 20px !important;
-    letter-spacing: 0.02em !important;
     transition: all 0.2s ease !important;
     box-shadow: 0 4px 14px rgba(99,102,241,0.25) !important;
 }
@@ -199,45 +227,45 @@ html, body, [data-testid="stAppViewContainer"] {
     box-shadow: 0 8px 24px rgba(99,102,241,0.4) !important;
 }
 
-/* Regenerate button (secondary) */
-.regen-btn .stButton > button {
-    background: #1E293B !important;
+/* Remove / secondary buttons */
+.btn-remove .stButton > button, .btn-secondary .stButton > button {
+    background: #0F172A !important;
+    border: 1px solid #334155 !important;
+    box-shadow: none !important;
+    color: #64748B !important;
+    font-size: 0.75rem !important;
+    padding: 5px 10px !important;
+}
+.btn-remove .stButton > button:hover, .btn-secondary .stButton > button:hover {
+    border-color: #EF4444 !important;
+    color: #EF4444 !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+.btn-regen .stButton > button {
+    background: #0F172A !important;
     border: 1px solid #334155 !important;
     box-shadow: none !important;
     color: #94A3B8 !important;
+    font-size: 0.85rem !important;
 }
-.regen-btn .stButton > button:hover {
+.btn-regen .stButton > button:hover {
     border-color: #6366F1 !important;
-    color: #F8FAFC !important;
-    box-shadow: none !important;
+    color: #818CF8 !important;
     transform: none !important;
+    box-shadow: none !important;
 }
 
-/* ── Banners ── */
-.ff-banner-success {
-    background: rgba(16,185,129,0.1);
-    border: 1px solid rgba(16,185,129,0.3);
-    border-radius: 10px;
-    padding: 12px 18px;
-    font-size: 0.84rem;
-    color: #34D399;
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-/* ── Preview Section ── */
+/* ── Preview empty ── */
 .ff-preview-empty {
     background: linear-gradient(135deg, #0F172A, #1E293B);
     border: 1px dashed #334155;
     border-radius: 14px;
     padding: 70px 20px;
     text-align: center;
-    color: #475569;
 }
-.ff-preview-empty .icon { font-size: 2.8rem; margin-bottom: 12px; opacity: 0.5; }
-.ff-preview-empty p { font-size: 0.95rem; font-weight: 500; color: #64748B; }
+.ff-preview-empty .icon { font-size: 2.8rem; margin-bottom: 10px; opacity: 0.4; }
+.ff-preview-empty p { font-size: 0.9rem; font-weight: 500; color: #475569; }
 
 /* ── Images ── */
 [data-testid="stImage"] img {
@@ -245,17 +273,16 @@ html, body, [data-testid="stAppViewContainer"] {
     box-shadow: 0 8px 32px rgba(0,0,0,0.4) !important;
 }
 
-/* ── Section divider ── */
-.ff-divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, #334155, transparent);
-    margin: 8px 0 20px;
-}
+/* ── Divider ── */
+.ff-divider { height: 1px; background: linear-gradient(90deg,transparent,#334155,transparent); margin: 10px 0 18px; }
+
+/* ── Column spacing ── */
+[data-testid="column"] { padding: 0 5px !important; }
 
 /* ── Footer ── */
 .ff-footer {
     text-align: center;
-    padding: 24px 0 20px;
+    padding: 22px 0 16px;
     font-size: 0.76rem;
     color: #475569;
     border-top: 1px solid #1E293B;
@@ -263,24 +290,13 @@ html, body, [data-testid="stAppViewContainer"] {
 }
 .ff-footer span { color: #6366F1; font-weight: 600; }
 
-/* ── Column spacing ── */
-[data-testid="column"] { padding: 0 6px !important; }
-
-/* ── Info chip ── */
-.ff-info-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(99,102,241,0.1);
-    border: 1px solid rgba(99,102,241,0.2);
-    border-radius: 20px;
-    padding: 4px 12px;
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: #818CF8;
-    margin-bottom: 20px;
+/* ── Section title ── */
+.ff-section-title {
+    font-size: 0.93rem;
+    font-weight: 600;
+    color: #F8FAFC;
+    margin-bottom: 14px;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -294,126 +310,108 @@ QUALITY_OPTIONS = {
     "4K (3840 × 2376px)": (3840, 2376),
 }
 
-LAYOUT_OPTIONS = [
-    "Classic Split",
-    "Mosaic",
-    "Grid",
-    "Triptych",
-    "Feature Hero",
-]
+LAYOUT_OPTIONS = ["Classic Split", "Mosaic", "Grid", "Triptych", "Feature Hero"]
 
-EXPORT_OPTIONS = {
-    "Standard (1x)": 85,
-    "Better Quality (2x)": 95,
-    "Maximum Quality (3x)": 100,
-}
+EXPORT_OPTIONS = {"Standard (1x)": 85, "Better Quality (2x)": 95, "Maximum Quality (3x)": 100}
 
-MIN_IMAGES = {
-    "Classic Split": 3,
-    "Mosaic": 3,
-    "Grid": 4,
-    "Triptych": 3,
-    "Feature Hero": 4,
-}
+MIN_IMAGES = {"Classic Split": 3, "Mosaic": 3, "Grid": 4, "Triptych": 3, "Feature Hero": 4}
 
-# ─── Image Processing ─────────────────────────────────────────────────────────
+# ─── Session State ────────────────────────────────────────────────────────────
+def init_state():
+    defaults = {
+        "stored_images": [],   # list of {name, bytes, b64_thumb}
+        "collage_buf": None,
+        "preview_img": None,
+        "show_success": False,
+        "generating": False,
+    }
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
+
+init_state()
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+def make_thumb_b64(img_bytes: bytes, size=(184, 144)) -> str:
+    img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    w, h = img.size
+    ratio = min(size[0]/w, size[1]/h)
+    img = img.resize((int(w*ratio), int(h*ratio)), Image.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=70)
+    return base64.b64encode(buf.getvalue()).decode()
+
 def fit_image(img, w, h):
     img = img.convert("RGBA")
-    src_r = img.width / img.height
-    tgt_r = w / h
-    if src_r > tgt_r:
-        new_w = int(img.height * tgt_r)
-        left = (img.width - new_w) // 2
-        img = img.crop((left, 0, left + new_w, img.height))
+    sr = img.width / img.height
+    tr = w / h
+    if sr > tr:
+        nw = int(img.height * tr)
+        l = (img.width - nw) // 2
+        img = img.crop((l, 0, l+nw, img.height))
     else:
-        new_h = int(img.width / tgt_r)
-        top = (img.height - new_h) // 2
-        img = img.crop((0, top, img.width, top + new_h))
+        nh = int(img.width / tr)
+        t = (img.height - nh) // 2
+        img = img.crop((0, t, img.width, t+nh))
     return img.resize((w, h), Image.LANCZOS)
 
 def make_canvas(W, H):
-    return Image.new("RGBA", (W, H), (15, 23, 42, 255))  # #0F172A
+    return Image.new("RGBA", (W, H), (15, 23, 42, 255))
 
 def generate_classic(images, W, H, b):
-    canvas = make_canvas(W, H)
-    main_w = int(W / PHI)
-    side_w = W - main_w
-    sub_h = int(H / PHI)
-    imgs = [images[i % len(images)] for i in range(3)]
-    canvas.paste(fit_image(imgs[0], main_w - b * 2, H - b * 2), (b, b))
-    canvas.paste(fit_image(imgs[1], side_w - b * 2, sub_h - b * 2), (main_w + b, b))
-    canvas.paste(fit_image(imgs[2], side_w - b * 2, H - sub_h - b * 2), (main_w + b, sub_h + b))
-    return canvas.convert("RGB")
+    c = make_canvas(W, H)
+    mw = int(W/PHI); sw = W-mw; sh = int(H/PHI)
+    imgs = [images[i%len(images)] for i in range(3)]
+    c.paste(fit_image(imgs[0], mw-b*2, H-b*2), (b, b))
+    c.paste(fit_image(imgs[1], sw-b*2, sh-b*2), (mw+b, b))
+    c.paste(fit_image(imgs[2], sw-b*2, H-sh-b*2), (mw+b, sh+b))
+    return c.convert("RGB")
 
 def generate_mosaic(images, W, H, b):
-    canvas = make_canvas(W, H)
-    n = min(len(images), 6)
-    row1_h = int(H * (1 / PHI))
-    row2_h = H - row1_h
+    c = make_canvas(W, H); n = min(len(images), 6)
+    r1h = int(H*(1/PHI)); r2h = H-r1h
     if n <= 3:
-        col_w = (W - b * (n + 1)) // n
-        for i in range(n):
-            x = b + i * (col_w + b)
-            canvas.paste(fit_image(images[i], col_w, H - b * 2), (x, b))
+        cw = (W-b*(n+1))//n
+        for i in range(n): c.paste(fit_image(images[i], cw, H-b*2), (b+i*(cw+b), b))
     else:
-        top_n = min(n, 3)
-        col_w_top = (W - b * (top_n + 1)) // top_n
-        for i in range(top_n):
-            x = b + i * (col_w_top + b)
-            canvas.paste(fit_image(images[i], col_w_top, row1_h - b), (x, b))
-        bot_imgs = images[top_n:n]
-        bot_n = len(bot_imgs)
-        if bot_n:
-            col_w_bot = (W - b * (bot_n + 1)) // bot_n
-            for i, img in enumerate(bot_imgs):
-                x = b + i * (col_w_bot + b)
-                canvas.paste(fit_image(img, col_w_bot, row2_h - b), (x, row1_h + b))
-    return canvas.convert("RGB")
+        top_n = min(n, 3); cw = (W-b*(top_n+1))//top_n
+        for i in range(top_n): c.paste(fit_image(images[i], cw, r1h-b), (b+i*(cw+b), b))
+        bi = images[top_n:n]; bn = len(bi)
+        if bn:
+            bw = (W-b*(bn+1))//bn
+            for i, img in enumerate(bi): c.paste(fit_image(img, bw, r2h-b), (b+i*(bw+b), r1h+b))
+    return c.convert("RGB")
 
 def generate_grid(images, W, H, b):
-    n = min(len(images), 9)
-    cols = math.ceil(math.sqrt(n))
-    rows = math.ceil(n / cols)
-    cell_w = (W - b * (cols + 1)) // cols
-    cell_h = (H - b * (rows + 1)) // rows
-    canvas = make_canvas(W, H)
+    n = min(len(images), 9); cols = math.ceil(math.sqrt(n)); rows = math.ceil(n/cols)
+    cw = (W-b*(cols+1))//cols; ch = (H-b*(rows+1))//rows
+    c = make_canvas(W, H)
     for idx in range(n):
-        row = idx // cols
-        col = idx % cols
-        canvas.paste(fit_image(images[idx], cell_w, cell_h),
-                     (b + col * (cell_w + b), b + row * (cell_h + b)))
-    return canvas.convert("RGB")
+        row=idx//cols; col=idx%cols
+        c.paste(fit_image(images[idx], cw, ch), (b+col*(cw+b), b+row*(ch+b)))
+    return c.convert("RGB")
 
 def generate_triptych(images, W, H, b):
-    panel_w = (W - b * 4) // 3
-    canvas = make_canvas(W, H)
-    imgs = [images[i % len(images)] for i in range(3)]
-    for i, img in enumerate(imgs):
-        canvas.paste(fit_image(img, panel_w, H - b * 2), (b + i * (panel_w + b), b))
-    return canvas.convert("RGB")
+    pw = (W-b*4)//3; c = make_canvas(W, H)
+    imgs = [images[i%len(images)] for i in range(3)]
+    for i, img in enumerate(imgs): c.paste(fit_image(img, pw, H-b*2), (b+i*(pw+b), b))
+    return c.convert("RGB")
 
 def generate_feature(images, W, H, b):
-    hero_w = int(W * 0.58)
-    strip_w = W - hero_w - b * 3
-    canvas = make_canvas(W, H)
-    imgs = [images[i % len(images)] for i in range(4)]
-    canvas.paste(fit_image(imgs[0], hero_w - b, H - b * 2), (b, b))
-    strip_h = (H - b * 4) // 3
-    for i in range(3):
-        canvas.paste(fit_image(imgs[i + 1], strip_w, strip_h),
-                     (hero_w + b * 2, b + i * (strip_h + b)))
-    return canvas.convert("RGB")
+    hw = int(W*0.58); sw = W-hw-b*3; c = make_canvas(W, H)
+    imgs = [images[i%len(images)] for i in range(4)]
+    c.paste(fit_image(imgs[0], hw-b, H-b*2), (b, b))
+    sh = (H-b*4)//3
+    for i in range(3): c.paste(fit_image(imgs[i+1], sw, sh), (hw+b*2, b+i*(sh+b)))
+    return c.convert("RGB")
 
 GENERATORS = {
-    "Classic Split": generate_classic,
-    "Mosaic": generate_mosaic,
-    "Grid": generate_grid,
-    "Triptych": generate_triptych,
-    "Feature Hero": generate_feature,
+    "Classic Split": generate_classic, "Mosaic": generate_mosaic,
+    "Grid": generate_grid, "Triptych": generate_triptych, "Feature Hero": generate_feature,
 }
 
-def build_collage(files, layout, quality_key, border_px):
-    imgs = [Image.open(f) for f in files]
+def build_collage(stored, layout, quality_key, border_px):
+    imgs = [Image.open(io.BytesIO(s["bytes"])) for s in stored]
     W, H = QUALITY_OPTIONS[quality_key]
     collage = GENERATORS[layout](imgs, W, H, border_px)
     buf = io.BytesIO()
@@ -421,14 +419,9 @@ def build_collage(files, layout, quality_key, border_px):
     buf.seek(0)
     preview = collage.copy()
     if preview.width > 860:
-        ratio = 860 / preview.width
-        preview = preview.resize((860, int(preview.height * ratio)), Image.LANCZOS)
+        r = 860/preview.width
+        preview = preview.resize((860, int(preview.height*r)), Image.LANCZOS)
     return buf, preview
-
-# ─── Session State ────────────────────────────────────────────────────────────
-for key in ["collage_buf", "preview_img", "show_success"]:
-    if key not in st.session_state:
-        st.session_state[key] = None if key != "show_success" else False
 
 # ─── Header ───────────────────────────────────────────────────────────────────
 st.markdown("""
@@ -439,74 +432,163 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ─── Success Banner ───────────────────────────────────────────────────────────
-if st.session_state.show_success:
-    st.markdown("""
-    <div class="ff-banner-success">
-      ✅ &nbsp;Collage generated successfully! Click <strong>'Download'</strong> to save.
-    </div>
-    """, unsafe_allow_html=True)
+# ─── Dynamic Status Bar ───────────────────────────────────────────────────────
+n_stored = len(st.session_state.stored_images)
+min_req = MIN_IMAGES.get(
+    st.session_state.get("layout_style_val", "Classic Split"), 3
+)
 
-# ─── Upload Section ───────────────────────────────────────────────────────────
-st.markdown('<div class="ff-card">', unsafe_allow_html=True)
-st.markdown("""
-<div style="text-align:center; padding-bottom:16px;">
-  <div style="font-size:2.4rem; margin-bottom:10px;">📸</div>
-  <div class="ff-upload-label">Drop your photos here</div>
-  <div class="ff-upload-sub">Upload 3–10 images to get started</div>
+if st.session_state.show_success:
+    status_cls, status_icon, status_msg = "success", "✅", "Collage generated! Click <strong>'Download'</strong> to save."
+elif n_stored == 0:
+    status_cls, status_icon, status_msg = "", "💡", "Upload images to get started"
+elif n_stored < min_req:
+    status_cls, status_icon, status_msg = "", "📸", f"{n_stored} image{'s' if n_stored>1 else ''} selected — add {min_req-n_stored} more"
+else:
+    status_cls, status_icon, status_msg = "ready", "📸", f"{n_stored} of 10 images selected — ready to generate"
+
+st.markdown(f"""
+<div class="ff-status {status_cls}">
+  <span style="font-size:1.1rem">{status_icon}</span>
+  <span>{status_msg}</span>
 </div>
 """, unsafe_allow_html=True)
 
-uploaded_files = st.file_uploader(
+# ─── Upload Section ───────────────────────────────────────────────────────────
+st.markdown('<div class="ff-card">', unsafe_allow_html=True)
+st.markdown('<div class="ff-section-title">📂 Upload Photos</div>', unsafe_allow_html=True)
+st.markdown("""
+<div style="text-align:center;padding:6px 0 14px;">
+  <div style="font-size:2rem;margin-bottom:6px;">📸</div>
+  <div style="font-size:1rem;font-weight:600;color:#F8FAFC;margin-bottom:4px;">Drop your photos here</div>
+  <div style="font-size:0.8rem;color:#64748B;">Upload 3–10 images • JPG, PNG, WebP supported</div>
+</div>
+""", unsafe_allow_html=True)
+
+new_files = st.file_uploader(
     "Upload Photos",
     type=["jpg", "jpeg", "png", "webp"],
     accept_multiple_files=True,
     label_visibility="collapsed",
+    key="file_uploader",
 )
-st.markdown('</div>', unsafe_allow_html=True)
+
+# Merge new uploads into stored_images (avoid duplicates by name)
+if new_files:
+    existing_names = {s["name"] for s in st.session_state.stored_images}
+    added = 0
+    for f in new_files:
+        if f.name not in existing_names and len(st.session_state.stored_images) < 10:
+            raw = f.read()
+            st.session_state.stored_images.append({
+                "name": f.name,
+                "bytes": raw,
+                "b64_thumb": make_thumb_b64(raw),
+            })
+            existing_names.add(f.name)
+            added += 1
+    if added:
+        st.session_state.show_success = False
+        st.session_state.collage_buf = None
+        st.session_state.preview_img = None
+        st.rerun()
+
+# ── Thumbnail Grid ────────────────────────────────────────────────────────────
+if st.session_state.stored_images:
+    st.markdown(f"""
+    <div class="thumb-count">
+      {len(st.session_state.stored_images)} of 10 images selected
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Build thumbnail HTML row
+    thumbs_html = '<div class="thumb-grid">'
+    for i, item in enumerate(st.session_state.stored_images):
+        thumbs_html += f"""
+        <div class="thumb-item">
+          <img src="data:image/jpeg;base64,{item['b64_thumb']}" title="{item['name']}"/>
+          <span class="thumb-num">{i+1}</span>
+        </div>"""
+    thumbs_html += "</div>"
+    st.markdown(thumbs_html, unsafe_allow_html=True)
+
+    # Remove buttons row (one per image)
+    n = len(st.session_state.stored_images)
+    if n <= 5:
+        cols = st.columns(n)
+        for i, col in enumerate(cols):
+            with col:
+                st.markdown('<div class="btn-remove">', unsafe_allow_html=True)
+                if st.button(f"✕ #{i+1}", key=f"rm_{i}", use_container_width=True):
+                    st.session_state.stored_images.pop(i)
+                    st.session_state.show_success = False
+                    st.session_state.collage_buf = None
+                    st.session_state.preview_img = None
+                    st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        # Two rows of remove buttons if many images
+        row1 = st.columns(5)
+        row2 = st.columns(n - 5)
+        for i, col in enumerate(row1):
+            with col:
+                st.markdown('<div class="btn-remove">', unsafe_allow_html=True)
+                if st.button(f"✕ #{i+1}", key=f"rm_{i}", use_container_width=True):
+                    st.session_state.stored_images.pop(i)
+                    st.session_state.show_success = False
+                    st.session_state.collage_buf = None
+                    st.session_state.preview_img = None
+                    st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+        for j, col in enumerate(row2):
+            i = 5 + j
+            with col:
+                st.markdown('<div class="btn-remove">', unsafe_allow_html=True)
+                if st.button(f"✕ #{i+1}", key=f"rm_{i}", use_container_width=True):
+                    st.session_state.stored_images.pop(i)
+                    st.session_state.show_success = False
+                    st.session_state.collage_buf = None
+                    st.session_state.preview_img = None
+                    st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+
+    # Clear all button
+    st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
+    _, col_clear, _ = st.columns([3, 1, 3])
+    with col_clear:
+        st.markdown('<div class="btn-secondary">', unsafe_allow_html=True)
+        if st.button("🗑 Clear All", use_container_width=True):
+            st.session_state.stored_images = []
+            st.session_state.collage_buf = None
+            st.session_state.preview_img = None
+            st.session_state.show_success = False
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+st.markdown('</div>', unsafe_allow_html=True)  # end upload card
 
 # ─── Settings Panel ───────────────────────────────────────────────────────────
 st.markdown('<div class="ff-card">', unsafe_allow_html=True)
-st.markdown('<div style="font-size:0.95rem; font-weight:600; color:#F8FAFC; margin-bottom:18px;">⚙️ Settings</div>', unsafe_allow_html=True)
+st.markdown('<div class="ff-section-title">⚙️ Settings</div>', unsafe_allow_html=True)
 
 col1, col2, col3 = st.columns(3)
-
 with col1:
     st.markdown('<div class="ff-label">Output Quality</div>', unsafe_allow_html=True)
-    quality_key = st.selectbox("Quality", list(QUALITY_OPTIONS.keys()),
-                               index=2, label_visibility="collapsed")
+    quality_key = st.selectbox("Quality", list(QUALITY_OPTIONS.keys()), index=2, label_visibility="collapsed")
     if "2K" in quality_key:
         st.markdown('<span class="ff-badge">Recommended</span>', unsafe_allow_html=True)
 
 with col2:
     st.markdown('<div class="ff-label">Layout Style</div>', unsafe_allow_html=True)
-    layout_style = st.selectbox("Layout", LAYOUT_OPTIONS,
-                                index=0, label_visibility="collapsed")
+    layout_style = st.selectbox("Layout", LAYOUT_OPTIONS, index=0, label_visibility="collapsed")
+    st.session_state["layout_style_val"] = layout_style
 
 with col3:
     st.markdown('<div class="ff-label">Border Width</div>', unsafe_allow_html=True)
-    border_width = st.slider("Border", 0, 40, 10, 2,
-                             format="%dpx", label_visibility="collapsed")
-    st.markdown(f'<div style="font-size:0.78rem; color:#64748B; margin-top:4px;">{border_width}px gap</div>',
-                unsafe_allow_html=True)
+    border_width = st.slider("Border", 0, 40, 10, 2, format="%dpx", label_visibility="collapsed")
+    st.markdown(f'<div style="font-size:0.75rem;color:#64748B;margin-top:3px;">{border_width}px gap</div>', unsafe_allow_html=True)
 
-# ─── Layout info row ──────────────────────────────────────────────────────────
-st.markdown('<div style="height:8px;"></div>', unsafe_allow_html=True)
-col4, col5 = st.columns([1, 1])
-with col4:
-    st.markdown('<div class="ff-label">Export Quality</div>', unsafe_allow_html=True)
-    export_quality = st.selectbox("Export", list(EXPORT_OPTIONS.keys()),
-                                  index=1, label_visibility="collapsed")
-with col5:
-    n_up = len(uploaded_files) if uploaded_files else 0
-    min_req = MIN_IMAGES.get(layout_style, 3)
-    if n_up < min_req:
-        status_html = f'<div style="font-size:0.83rem; color:#64748B; padding-top:26px;">📂 Add {min_req - n_up} more photo{"s" if min_req-n_up>1 else ""} for <em>{layout_style}</em></div>'
-    else:
-        status_html = f'<div style="font-size:0.83rem; color:#34D399; padding-top:26px;">✓ {n_up} photo{"s" if n_up>1 else ""} ready</div>'
-    st.markdown(status_html, unsafe_allow_html=True)
-
-st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)  # end settings card
 
 # ─── Generate Button ──────────────────────────────────────────────────────────
 _, col_btn, _ = st.columns([1, 2, 1])
@@ -515,15 +597,16 @@ with col_btn:
 
 # ─── Generate Logic ───────────────────────────────────────────────────────────
 if generate_clicked:
+    stored = st.session_state.stored_images
     min_req = MIN_IMAGES.get(layout_style, 3)
-    if not uploaded_files or len(uploaded_files) < min_req:
+    if not stored or len(stored) < min_req:
         st.warning(f"Please upload at least **{min_req} photos** for the **{layout_style}** layout.")
-    elif len(uploaded_files) > 10:
-        st.warning("Please upload a maximum of **10 photos**.")
+    elif len(stored) > 10:
+        st.warning("Please use a maximum of **10 photos**.")
     else:
-        with st.spinner("Creating your collage…"):
+        with st.spinner("✨ Generating your collage…"):
             try:
-                buf, preview = build_collage(uploaded_files, layout_style, quality_key, border_width)
+                buf, preview = build_collage(stored, layout_style, quality_key, border_width)
                 st.session_state.collage_buf = buf.read()
                 st.session_state.preview_img = preview
                 st.session_state.show_success = True
@@ -532,16 +615,14 @@ if generate_clicked:
                 st.error(f"Something went wrong: {e}")
 
 # ─── Preview Section ──────────────────────────────────────────────────────────
-st.markdown('<div style="height:8px;"></div>', unsafe_allow_html=True)
 st.markdown('<div class="ff-card">', unsafe_allow_html=True)
 
-col_t, col_r1, col_r2 = st.columns([3, 1.1, 1.1])
+col_t, col_r1, col_r2 = st.columns([3, 1, 1])
 with col_t:
-    st.markdown('<div style="font-size:0.95rem; font-weight:600; color:#F8FAFC; padding-top:8px;">🖼️ Collage Preview</div>',
-                unsafe_allow_html=True)
+    st.markdown('<div class="ff-section-title" style="margin-bottom:0;padding-top:6px;">🖼️ Collage Preview</div>', unsafe_allow_html=True)
 with col_r1:
     if st.session_state.collage_buf:
-        st.markdown('<div class="regen-btn">', unsafe_allow_html=True)
+        st.markdown('<div class="btn-regen">', unsafe_allow_html=True)
         if st.button("🔄 Redo", use_container_width=True):
             st.session_state.collage_buf = None
             st.session_state.preview_img = None
@@ -570,7 +651,7 @@ else:
     </div>
     """, unsafe_allow_html=True)
 
-st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)  # end preview card
 
 # ─── Footer ───────────────────────────────────────────────────────────────────
 st.markdown("""
