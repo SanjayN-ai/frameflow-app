@@ -243,36 +243,31 @@ html, body, [data-testid="stAppViewContainer"] {
 }
 .stDownloadButton > button:hover {
     transform: translateY(-2px) !important;
+    transform: translateY(-2px) !important;
     box-shadow: 0 8px 24px rgba(99,102,241,0.4) !important;
 }
 
-/* Remove / secondary buttons */
-.btn-remove .stButton > button, .btn-secondary .stButton > button {
-    background: #0F172A !important;
-    border: 1px solid #334155 !important;
-    box-shadow: none !important;
-    color: #64748B !important;
-    font-size: 0.75rem !important;
-    padding: 5px 10px !important;
-}
-.btn-remove .stButton > button:hover, .btn-secondary .stButton > button:hover {
-    border-color: #EF4444 !important;
-    color: #EF4444 !important;
-    transform: none !important;
-    box-shadow: none !important;
-}
-.btn-regen .stButton > button {
+/* Remove / secondary buttons (target secondary type) */
+[data-testid="baseButton-secondary"] {
     background: #0F172A !important;
     border: 1px solid #334155 !important;
     box-shadow: none !important;
     color: #94A3B8 !important;
     font-size: 0.85rem !important;
+    padding: 8px 16px !important;
+    font-weight: 500 !important;
 }
-.btn-regen .stButton > button:hover {
-    border-color: #6366F1 !important;
-    color: #818CF8 !important;
+[data-testid="baseButton-secondary"]:hover {
+    border-color: #EF4444 !important;
+    color: #EF4444 !important;
     transform: none !important;
     box-shadow: none !important;
+}
+
+/* Redo button specifically */
+.btn-regen [data-testid="baseButton-secondary"]:hover {
+    border-color: #6366F1 !important;
+    color: #818CF8 !important;
 }
 
 /* ── Preview empty ── */
@@ -522,44 +517,38 @@ with st.container():
         thumbs_html += "</div>"
         st.markdown(thumbs_html, unsafe_allow_html=True)
 
+        # Callbacks for reliable state updates
+        def remove_img(idx):
+            st.session_state.stored_images.pop(idx)
+            st.session_state.show_success = False
+            st.session_state.collage_buf = None
+            st.session_state.preview_img = None
+        
+        def clear_all():
+            st.session_state.stored_images = []
+            st.session_state.show_success = False
+            st.session_state.collage_buf = None
+            st.session_state.preview_img = None
+
         # Remove buttons (one per image)
         n = len(st.session_state.stored_images)
         rm_cols = st.columns(min(n, 5))
         for i in range(min(n, 5)):
             with rm_cols[i]:
-                st.markdown('<div class="btn-remove">', unsafe_allow_html=True)
-                if st.button(f"✕ #{i+1}", key=f"rm_{i}", use_container_width=True):
-                    st.session_state.stored_images.pop(i)
-                    st.session_state.show_success = False
-                    st.session_state.collage_buf = None
-                    st.session_state.preview_img = None
-                    st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
+                st.button(f"✕ #{i+1}", key=f"rm_{i}", on_click=remove_img, args=(i,), type="secondary", use_container_width=True)
+                
         if n > 5:
             rm_cols2 = st.columns(n - 5)
             for j in range(n - 5):
                 i = 5 + j
                 with rm_cols2[j]:
-                    st.markdown('<div class="btn-remove">', unsafe_allow_html=True)
-                    if st.button(f"✕ #{i+1}", key=f"rm_{i}", use_container_width=True):
-                        st.session_state.stored_images.pop(i)
-                        st.session_state.show_success = False
-                        st.session_state.collage_buf = None
-                        st.session_state.preview_img = None
-                        st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
+                    st.button(f"✕ #{i+1}", key=f"rm_{i}", on_click=remove_img, args=(i,), type="secondary", use_container_width=True)
 
         # Clear all
+        st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
         _, col_clear, _ = st.columns([3, 1, 3])
         with col_clear:
-            st.markdown('<div class="btn-secondary">', unsafe_allow_html=True)
-            if st.button("🗑 Clear All", use_container_width=True):
-                st.session_state.stored_images = []
-                st.session_state.collage_buf = None
-                st.session_state.preview_img = None
-                st.session_state.show_success = False
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
+            st.button("🗑 Clear All", on_click=clear_all, type="secondary", use_container_width=True)
 
 # ─── Settings Panel ───────────────────────────────────────────────────────────
 st.markdown('<div class="ff-card"><div class="ff-section-title">⚙️ Settings</div></div>', unsafe_allow_html=True)
